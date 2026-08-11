@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI HOT 仪表盘 · 日报 / 周报</title>
+<style>
+  :root{--bg:#0b0e14;--bg2:#11151f;--card:#161b27;--card2:#1b2230;--txt:#e6e9ef;--mut:#9aa4b2;--line:#222a38;--accent:#6366f1;--wx:#07c160;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:radial-gradient(1200px 600px at 80% -10%,#1a2138 0%,var(--bg) 55%) fixed;color:var(--txt);line-height:1.6;padding-bottom:64px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  .hero{padding:40px 0 22px}
+  .kicker{color:var(--mut);font-size:13px;letter-spacing:.18em;text-transform:uppercase}
+  .hero h1{font-size:clamp(26px,5vw,42px);font-weight:800;margin:8px 0 4px;background:linear-gradient(90deg,#a5b4fc,#67e8f9,#fcd34d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .meta{color:var(--mut);font-size:14px;margin-top:4px}.meta b{color:var(--txt)}
+  .lead{margin-top:10px;font-size:14px;color:#cbd5e1;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px}
+  .lead .tag{color:var(--accent);font-weight:700;margin-right:6px}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:20px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;border-top:3px solid var(--c)}
+  .stat-n{display:block;font-size:24px;font-weight:800;color:var(--c)}
+  .stat-l{display:block;font-size:12px;color:var(--mut);margin-top:3px}
+  .bar{position:sticky;top:0;z-index:30;background:rgba(11,14,20,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:14px 0 24px}
+  .bar-in{display:flex;gap:8px;flex-wrap:wrap;align-items:center;max-width:1180px;margin:0 auto;padding:10px 20px}
+  .tab{font-weight:700;font-size:14px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;transition:.18s}
+  .tab.active{color:#0b0e14;background:linear-gradient(90deg,#a5b4fc,#67e8f9);border-color:transparent}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .fchip{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--mut);cursor:pointer;transition:.18s}
+  .fchip.on{color:var(--txt);border-color:var(--accent);background:#1e2436}
+  .fchip.wx.on{color:#062; border-color:var(--wx);background:#0c2a18}
+  #q{background:var(--card2);border:1px solid var(--line);border-radius:999px;color:var(--txt);padding:6px 12px;font-size:12.5px;outline:none}
+  .block{margin-bottom:36px;scroll-margin-top:64px}
+  .bh{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+  .bh .dot{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c)}
+  .bh h2{font-size:19px;font-weight:700}.bh .c{margin-left:auto;font-size:13px;color:var(--mut)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .card{position:relative;background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:17px 17px 15px;display:flex;flex-direction:column;min-height:165px;transition:.18s;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c);opacity:.85}
+  .card.wx::before{background:var(--wx)}
+  .card:hover{transform:translateY(-3px);border-color:var(--c);box-shadow:0 10px 30px -12px var(--c)}
+  .card.wx:hover{border-color:var(--wx);box-shadow:0 10px 30px -12px var(--wx)}
+  .ct{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+  .num{font-size:12.5px;font-weight:800;color:#0b0e14;background:#a5b4fc;border-radius:8px;padding:2px 8px;min-width:32px;text-align:center}
+  .card.wx .num{background:#6ee7b7}
+  .source{font-size:11.5px;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .source.wx{color:#7ee2a8;border-color:#0c3a22}
+  .time{margin-left:auto;font-size:11px;color:var(--mut)}
+  .title{font-size:16px;font-weight:700;line-height:1.4;margin-bottom:7px}
+  .title a{color:var(--txt);text-decoration:none}.title a:hover{color:#a5b4fc;text-decoration:underline;text-decoration-color:var(--accent)}
+  .card.wx .title a:hover{color:#6ee7b7}
+  .summary{font-size:13px;color:var(--mut);flex:1;margin-bottom:13px}
+  .read{align-self:flex-start;font-size:12.5px;font-weight:600;color:#a5b4fc;text-decoration:none;border:1px solid var(--accent);border-radius:9px;padding:5px 11px;transition:.18s}
+  .read:hover{background:var(--accent);color:#0b0e14}
+  .card.wx .read{color:#6ee7b7;border-color:var(--wx)}.card.wx .read:hover{background:var(--wx);color:#04130b}
+  .mpnote{margin:10px 0 0;font-size:12.5px;color:var(--wx)}
+  .foot{border-top:1px solid var(--line);margin-top:22px;padding-top:18px;color:var(--mut);font-size:12.5px;text-align:center}
+  .foot a{color:#67e8f9;text-decoration:none}
+  @media(max-width:720px){.stats{grid-template-columns:repeat(3,1fr)}.hero{padding:30px 0 16px}.filters{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="kicker">AI HOT · 每日 / 每周晨报</div>
+    <h1 id="title">AI 日报</h1>
+    <div class="meta" id="meta"></div>
+    <div class="lead" id="lead" style="display:none"></div>
+    <div class="stats" id="stats"></div>
+    <div class="mpnote" id="mpnote"></div>
+  </header>
+</div>
+<div class="bar">
+  <div class="bar-in">
+    <div class="tab active" data-view="daily">日报</div>
+    <div class="tab" data-view="weekly">周报</div>
+    <div class="filters">
+      <input id="q" placeholder="搜索关键词…" />
+      <span class="fchip wx" data-src="wechat">仅看公众号</span>
+    </div>
+  </div>
+</div>
+<div class="wrap">
+  <div id="sections"></div>
+  <footer class="foot">
+    <p>本仪表盘共 <b id="ftotal" style="color:var(--txt)"></b> 条 · 数据来源：<a href="https://aihot.virxact.com" target="_blank" rel="noopener noreferrer">AI HOT</a> + 微信公众号（伴生服务）</p>
+    <p style="margin-top:5px;opacity:.7">时间均为北京时间 · 摘要由 AI 生成，点击「阅读原文」核对详情</p>
+  </footer>
+</div>
+<script>
+const DATA = __DATA__;
+const SECTION_COLORS = {"模型发布/更新":"#6366f1","产品发布/更新":"#10b981","AI泛娱乐新闻":"#ec4899","行业动态":"#f59e0b","论文研究":"#f43f5e","技巧与观点":"#06b6d4"};
+let state = { view:"daily", src:null, q:"" };
+
+function esc(s){return (s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function render(){
+  const p = DATA[state.view];
+  document.getElementById("title").textContent = state.view==="daily" ? "AI 日报" : "AI 周报";
+  document.getElementById("meta").innerHTML = `${p.range.label} · 共 <b>${p.total}</b> 条 · 六版块 · 生成于 北京时间 ${p.generatedAt.slice(11,16)}`;
+  const lead = document.getElementById("lead");
+  if(state.view==="daily" && p.lead){ lead.style.display="block"; lead.innerHTML = `<span class="tag">今日头条</span>${esc(p.lead)}`; }
+  else lead.style.display="none";
+  document.getElementById("mpnote").textContent = p.mpStatus.note ? "公众号：" + p.mpStatus.note : "";
+  document.getElementById("stats").innerHTML = p.stats.map(s=>`<div class="stat" style="--c:${SECTION_COLORS[s.label]||'#64748b'}"><span class="stat-n">${s.count}</span><span class="stat-l">${s.label}</span></div>`).join("");
+  const q = state.q.toLowerCase();
+  let sectionsHtml = ""; let total=0;
+  p.sections.forEach(sec=>{
+    let items = sec.items;
+    if(state.src==="wechat") items = items.filter(i=>i.sourceType==="wechat");
+    if(q) items = items.filter(i=>(i.title||"").toLowerCase().includes(q)||(i.summary||"").toLowerCase().includes(q));
+    if(!items.length) return;
+    let n=0; const cards = items.map(i=>{ n++; total++;
+      const wx = i.sourceType==="wechat";
+      const srcCls = wx ? "source wx" : "source";
+      return `<article class="card ${wx?'wx':''}">
+        <div class="ct"><span class="num">${String(n).padStart(2,'0')}</span><span class="${srcCls}">${esc(i.source)}</span><span class="time">${esc(i.timeText||"")}</span></div>
+        <h3 class="title"><a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a></h3>
+        <p class="summary">${esc(i.summary)}</p>
+        <a class="read" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">阅读原文 →</a>
+      </article>`;
+    }).join("");
+    sectionsHtml += `<section class="block" style="--c:${SECTION_COLORS[sec.label]||'#64748b'}">
+      <header class="bh"><span class="dot"></span><h2>${sec.label}</h2><span class="c">${items.length} 条</span></header>
+      <div class="grid">${cards}</div></section>`;
+  });
+  document.getElementById("sections").innerHTML = sectionsHtml || `<p style="color:var(--mut)">无匹配内容。</p>`;
+  document.getElementById("ftotal").textContent = total;
+}
+
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); state.view=t.dataset.view; render();
+});
+document.querySelector(".fchip.wx").onclick=function(){ this.classList.toggle("on"); state.src=this.classList.contains("on")?"wechat":null; render(); };
+document.getElementById("q").oninput=function(){ state.q=this.value; render(); };
+render();
+</script>
+</body>
+</html>

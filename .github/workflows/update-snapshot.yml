@@ -1,0 +1,87 @@
+# AI HOT 仪表盘 · 定时更新静态快照并部署到 CloudBase
+#
+# 触发方式：
+#   1. 定时：每天北京时间 08:00（cron 使用 UTC，0 0 = UTC 00:00 = 北京 08:00）
+#   2. 手动：仓库 Actions 页 → 选中本工作流 → "Run workflow" 按钮
+#
+# 流程：
+#   checkout → 生成静态快照（抓 aihot API → 渲染 public/index.html）
+#   → 校验数据 → 提交回仓库（contents: write）→ 部署到 CloudBase 静态托管
+#
+# 需要配置的 GitHub Secrets（仓库 Settings → Secrets and variables → Actions）：
+#   TCB_SECRET_ID  腾讯云 SecretId（访问管理 CAM → API 密钥管理）
+#   TCB_SECRET_KEY 腾讯云 SecretKey
+#   TCB_ENV_ID     云开发环境 ID（本项目 workbuddy-d6g376q7d19b69f8f）
+
+name: 定时更新静态快照并部署
+
+on:
+  schedule:
+    # 每天北京时间 08:00 = UTC 00:00（GitHub cron 固定为 UTC 时区）
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "是否部署到 CloudBase（false 则只生成并提交快照）"
+        type: boolean
+        default: true
+
+# GITHUB_TOKEN 需要写权限才能把生成的文件提交回仓库
+permissions:
+  contents: write
+
+# 防止上一次运行还没结束、下一次定时触发时并发冲突
+concurrency:
+  group: ai-hot-snapshot
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 生成静态快照
+        run: python3 scripts/build_snapshot.py --out public/index.html
+
+      - name: 校验快照（日报/周报均有数据且 JSON 合法）
+        run: |
+          python3 - <<'EOF'
+          import json
+          html = open("public/index.html", encoding="utf-8").read()
+          start = html.index("const DATA = ") + len("const DATA = ")
+          data = json.loads(html[start: html.index(";\n", start)])
+          for view in ("daily", "weekly"):
+              p = data[view]
+              assert p["total"] > 0, f"{view} 无数据"
+              print(f"{view}: total={p['total']} range={p['range']['label']}")
+          EOF
+
+      - name: 提交快照回仓库（若内容有变化）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then
+            echo "快照无变化，跳过提交"
+          else
+            git commit -m "chore: 更新 AI HOT 静态快照 [skip ci]"
+            git push
+          fi
+
+      - name: 安装 CloudBase CLI
+        run: npm install -g @cloudbase/cli
+
+      - name: 部署到 CloudBase 静态托管
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        run: |
+          tcb login --apiKeyId "${{ secrets.TCB_SECRET_ID }}" --apiKey "${{ secrets.TCB_SECRET_KEY }}"
+          tcb hosting deploy public/index.html /index.html -e "${{ secrets.TCB_ENV_ID }}"
