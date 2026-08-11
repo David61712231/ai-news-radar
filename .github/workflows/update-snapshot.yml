@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: "是否部署到 GitHub Pages（false 则只生成并提交快照）"
+        description: "是否部署到 GitHub Pages（取消勾选则只生成并提交快照）"
         type: boolean
         default: true
 
@@ -78,23 +78,25 @@ jobs:
             echo "快照无变化，跳过提交"
           else
             git commit -m "chore: 更新 AI HOT 静态快照 [skip ci]"
+            # 先拉取远端（避免与他人/并发运行的提交冲突），再推送
+            git pull --rebase origin main
             git push
           fi
 
       - name: 准备 Pages 产物（站点根目录）
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy != 'false') }}
         run: |
           mkdir -p _site
           cp public/index.html _site/index.html
 
       - name: 上传 Pages 产物
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy != 'false') }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
       - name: 部署到 GitHub Pages
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy != 'false') }}
         id: deployment
         uses: actions/deploy-pages@v4
 
