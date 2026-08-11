@@ -23,6 +23,7 @@
 *.pem
 __pycache__/
 *.pyc
+/_site/
 
 # debug
 npm-debug.log*

@@ -1,4 +1,4 @@
-# AI HOT 仪表盘 · 定时更新静态快照并部署到 CloudBase
+# AI HOT 仪表盘 · 定时更新静态快照并部署到 GitHub Pages
 #
 # 触发方式：
 #   1. 定时：每天北京时间 08:00（cron 使用 UTC，0 0 = UTC 00:00 = 北京 08:00）
@@ -6,12 +6,10 @@
 #
 # 流程：
 #   checkout → 生成静态快照（抓 aihot API → 渲染 public/index.html）
-#   → 校验数据 → 提交回仓库（contents: write）→ 部署到 CloudBase 静态托管
+#   → 校验数据 → 提交回仓库（contents: write）→ 部署到 GitHub Pages
 #
-# 需要配置的 GitHub Secrets（仓库 Settings → Secrets and variables → Actions）：
-#   TCB_SECRET_ID  腾讯云 SecretId（访问管理 CAM → API 密钥管理）
-#   TCB_SECRET_KEY 腾讯云 SecretKey
-#   TCB_ENV_ID     云开发环境 ID（本项目 workbuddy-d6g376q7d19b69f8f）
+# 固定访问链接：https://wadeliuastro.github.io/AI-HOT/
+# 前置条件：仓库 Settings → Pages → Source 选择 "GitHub Actions"
 
 name: 定时更新静态快照并部署
 
@@ -22,13 +20,16 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: "是否部署到 CloudBase（false 则只生成并提交快照）"
+        description: "是否部署到 GitHub Pages（false 则只生成并提交快照）"
         type: boolean
         default: true
 
-# GITHUB_TOKEN 需要写权限才能把生成的文件提交回仓库
+# GITHUB_TOKEN 需要写权限才能把生成的文件提交回仓库；
+# pages/id-token 权限是官方 Pages 部署 action（deploy-pages）必需
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 # 防止上一次运行还没结束、下一次定时触发时并发冲突
 concurrency:
@@ -39,6 +40,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: 检出仓库
@@ -77,11 +81,25 @@ jobs:
             git push
           fi
 
-      - name: 安装 CloudBase CLI
-        run: npm install -g @cloudbase/cli
-
-      - name: 部署到 CloudBase 静态托管
+      - name: 准备 Pages 产物（站点根目录）
         if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
         run: |
-          tcb login --apiKeyId "${{ secrets.TCB_SECRET_ID }}" --apiKey "${{ secrets.TCB_SECRET_KEY }}"
-          tcb hosting deploy public/index.html /index.html -e "${{ secrets.TCB_ENV_ID }}"
+          mkdir -p _site
+          cp public/index.html _site/index.html
+
+      - name: 上传 Pages 产物
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: 部署到 GitHub Pages
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.deploy == 'true') }}
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: 显示固定访问链接
+        if: ${{ steps.deployment.outputs.page_url != '' }}
+        run: |
+          echo "### ✅ 看板已更新，固定访问链接：" >> $GITHUB_STEP_SUMMARY
+          echo "[AI HOT 仪表盘](https://wadeliuastro.github.io/AI-HOT/)" >> $GITHUB_STEP_SUMMARY
