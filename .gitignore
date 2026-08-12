@@ -25,6 +25,7 @@ __pycache__/
 *.pyc
 /_site/
 wechat_items.json
+.sogou_cookie
 
 # debug
 npm-debug.log*
