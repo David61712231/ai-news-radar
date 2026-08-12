@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""refresh_cookie.py — SOGOU_COOKIE 一键更新助手（半自动）。
+"""refresh_cookie.py — SOGOU_COOKIE 验证/更新助手（已降级为可选工具）。
 
-背景:
-    搜狗 Cookie 无法全自动续期（登录需人工验证；Chrome 127+ 的 App-Bound
-    Encryption 也阻断了从浏览器数据库自动提取 Cookie 的路径）。
-    本脚本把更新流程压缩为三步：粘贴 → 自动验证 → 按指引更新 GitHub Secret。
+重要变更（2026-08-12）:
+    fetch_wechat.py 已支持自动获取搜狗匿名会话 Cookie（首页预热），实测足以
+    通过搜索与跳转链反爬并解析出微信真实链接，因此正常情况下**无需配置
+    SOGOU_COOKIE**。本脚本仅用于：
+    - 排查抓取问题时验证当前 Cookie/匿名会话是否仍有效（--test）
+    - 搜狗风控升级时，手动提供登录态 Cookie 作为加固手段
 
 用法:
-    python scripts/refresh_cookie.py            # 交互式粘贴 Cookie
-    python scripts/refresh_cookie.py --test     # 只验证本地已保存的 Cookie 是否仍有效
+    python scripts/refresh_cookie.py            # 交互式粘贴 Cookie 并验证
+    python scripts/refresh_cookie.py --test     # 验证本地已保存的 Cookie 是否仍有效
     python scripts/refresh_cookie.py --clear    # 清除本地保存的 Cookie
-
-流程:
-    1. 从浏览器复制搜狗 Cookie（weixin.sogou.com → F12 → Network → 任意请求的 Cookie 头）
-    2. 脚本用该 Cookie 实测一次搜狗搜索 + 跳转链解析，确认有效
-    3. 有效则备份到本地 .sogou_cookie（已加入 .gitignore），并提示更新 GitHub Secret
 
 纯标准库实现。
 """
@@ -58,17 +55,23 @@ def verify_cookie(cookie: str) -> tuple[bool, bool, str]:
         return False, False, "搜索页触发反爬：Cookie 无效或已过期"
     if "txt-box" not in page:
         return False, False, "搜索页无结果：页面结构异常"
-    # 2. 跳转链解析测试（无 Cookie 时这一步常触发反爬）
+    # 2. 跳转链解析测试（搜狗把 URL 拆片用 url += '...' 拼接，需按序拼接）
+    import html as _html
     import re
     m = re.search(r'<h3>.*?<a[^>]+href="([^"]+)"', page, re.S)
     if not m:
         return True, False, "搜索正常，但未找到可测试的跳转链"
-    link = m.group(1)
+    link = _html.unescape(m.group(1)).strip()  # 还原 &amp; 等 HTML 实体
     if link.startswith("//"):
         link = "https:" + link
+    elif link.startswith("/"):
+        link = "https://weixin.sogou.com" + link
     try:
         jump_page = http_get(link, cookie=cookie, referer="https://weixin.sogou.com/")
-        if "mp.weixin.qq.com" in jump_page or re.search(r"'https?://mp\.weixin\.qq\.com[^']*'", jump_page):
+        parts = re.findall(r"url \+= '([^']*)'", jump_page)
+        if parts and "".join(parts).startswith("http"):
+            return True, True, "搜索 + 跳转链解析均正常（可获取微信真实链接）"
+        if "mp.weixin.qq.com" in jump_page:
             return True, True, "搜索 + 跳转链解析均正常（可获取微信真实链接）"
         if is_antispider(jump_page):
             return True, False, "搜索正常，但跳转链仍触发反爬（Cookie 权限不足）"

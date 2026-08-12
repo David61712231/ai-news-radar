@@ -23,6 +23,7 @@
 import argparse
 import hashlib
 import html
+import http.cookiejar
 import json
 import os
 import random
@@ -46,6 +47,30 @@ RE_TIMESTAMP = re.compile(r"timeConvert\('(\d+)'\)")
 RE_STRIP_TAG = re.compile(r"<[^>]+>")
 
 
+SESSION_OPENER = None  # 带 Cookie 会话（全局单例）
+
+
+def build_session(cookie: str = ""):
+    """建立带搜狗会话 Cookie 的请求会话。
+
+    先访问搜狗首页获取匿名会话 Cookie（SUV/SNUID/SUID 等，实测足以通过
+    搜索与跳转链反爬，无需登录搜狗账号），后续请求自动携带。
+    若传入 SOGOU_COOKIE 则优先使用（登录态 Cookie 更稳固）。
+    """
+    global SESSION_OPENER
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    headers = {"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9"}
+    if cookie:
+        headers["Cookie"] = cookie
+    try:
+        opener.open(urllib.request.Request("https://weixin.sogou.com/", headers=headers), timeout=20)
+    except Exception as exc:  # noqa: BLE001 - 首页预热失败不阻断，后续请求仍会尝试
+        print(f"搜狗首页预热失败（不影响后续尝试）: {exc}", file=sys.stderr)
+    SESSION_OPENER = opener
+    return opener
+
+
 def http_get(url: str, cookie: str = "", referer: str = "", timeout: int = 25) -> str:
     headers = {
         "User-Agent": UA,
@@ -57,7 +82,8 @@ def http_get(url: str, cookie: str = "", referer: str = "", timeout: int = 25) -
     if referer:
         headers["Referer"] = referer
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    opener = SESSION_OPENER or urllib.request.build_opener()
+    with opener.open(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
@@ -108,32 +134,40 @@ def parse_results(page: str, account: str, per_account: int, since_ts: int) -> l
     return out
 
 
+def parse_jump_url(page: str) -> str:
+    """从搜狗跳转页解析真实文章链接。
+
+    搜狗反爬把 URL 拆成片段用 JS 拼接：url += 'https://mp.'; url += 'weixin.qq.c'; ...
+    需按顺序提取所有 url += '...' 片段并拼接。
+    """
+    parts = re.findall(r"url \+= '([^']*)'", page)
+    if parts:
+        url = "".join(parts)
+        if url.startswith("http"):
+            return url
+    m = re.search(r"https?://mp\.weixin\.qq\.com/s[^\"'\s<>]*", page)
+    if m:
+        return html.unescape(m.group(0))
+    return ""
+
+
 def resolve_real_url(sogou_link: str, cookie: str = "") -> str:
     """跟踪搜狗跳转链，解析出 mp.weixin.qq.com 真实文章链接。
 
     搜狗中转链有时效（约数天到十几天），快照里必须存真实链接。
-    跳转页为 JS 重定向：拼接页面中的单引号字符串片段得到最终 URL。
-    无 Cookie 时跳转链常触发反爬验证页，此时退回搜狗链接（短期可打开）。
+    跳转页为 JS 重定向（URL 拆片拼接），需携带搜狗会话 Cookie 访问。
+    解析失败时退回原搜狗链接（可打开但有过期风险）。
     """
     if "mp.weixin.qq.com" in sogou_link:
         return sogou_link
     try:
         page = http_get(sogou_link, cookie=cookie, referer="https://weixin.sogou.com/")
         if is_antispider(page):
-            print("    跳转链触发反爬（建议配置 SOGOU_COOKIE），保留搜狗链接", file=sys.stderr)
+            print("    跳转链触发反爬（会话 Cookie 可能失效），保留搜狗链接", file=sys.stderr)
             return sogou_link
-        parts = re.findall(r"'((?:https?://|&)[^']*)'", page)
-        if parts:
-            url = parts[0]
-            for p in parts[1:]:
-                if p.startswith("&") or p.startswith("?"):
-                    url += p
-            if "mp.weixin.qq.com" in url:
-                return url.split("@")[-1] if "@" in url else url
-        # 兜底：直接从页面里抓 mp.weixin.qq.com 链接
-        m = re.search(r"https?://mp\.weixin\.qq\.com/s[^\"'\s<>]*", page)
-        if m:
-            return html.unescape(m.group(0))
+        real = parse_jump_url(page)
+        if real and "mp.weixin.qq.com" in real:
+            return real.split("@")[-1] if "@" in real else real
     except Exception as exc:  # noqa: BLE001 - 跳转解析失败不应中断整体抓取
         print(f"    跳转链解析失败（保留搜狗链接）: {exc}", file=sys.stderr)
     return sogou_link
@@ -180,7 +214,8 @@ def main() -> int:
         return 1
 
     cookie = os.environ.get("SOGOU_COOKIE", "")
-    print(f"开始抓取 {len(accounts)} 个公众号（Cookie: {'已配置' if cookie else '未配置'}，窗口: 近 {args.days} 天）")
+    build_session(cookie)  # 无 SOGOU_COOKIE 时自动用匿名会话 Cookie（首页预热获取）
+    print(f"开始抓取 {len(accounts)} 个公众号（Cookie: {'登录态' if cookie else '匿名会话'}，窗口: 近 {args.days} 天）")
     items, ok_count, fail_count = fetch_all(accounts, cookie, args.per_account, args.days)
 
     now = datetime.now(timezone.utc)
