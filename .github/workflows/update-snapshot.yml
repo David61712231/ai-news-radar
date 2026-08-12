@@ -1,22 +1,24 @@
 # AI HOT 仪表盘 · 定时更新静态快照并部署到 GitHub Pages
 #
 # 触发方式：
-#   1. 定时：每天北京时间 08:00（cron 使用 UTC，0 0 = UTC 00:00 = 北京 08:00）
+#   1. 定时：每天北京时间 08:00 / 13:00 / 20:00（cron 使用 UTC，0/5/12 = 北京 8/13/20 点）
 #   2. 手动：仓库 Actions 页 → 选中本工作流 → "Run workflow" 按钮
 #
 # 流程：
-#   checkout → 生成静态快照（抓 aihot API → 渲染 public/index.html）
-#   → 校验数据 → 提交回仓库（contents: write）→ 部署到 GitHub Pages
+#   checkout → 抓取公众号文章（搜狗微信搜索，可失败降级）
+#   → 生成静态快照（aihot API + 公众号数据合并 → public/index.html）
+#   → 校验数据 → 提交回仓库（contents: write）→ 断流告警检查 → 部署到 GitHub Pages
 #
 # 固定访问链接：https://wadeliuastro.github.io/AI-HOT/
 # 前置条件：仓库 Settings → Pages → Source 选择 "GitHub Actions"
+# 可选 Secret：SOGOU_COOKIE（搜狗 Cookie，降低公众号抓取被风控概率，约 2-4 周需更新）
 
 name: 定时更新静态快照并部署
 
 on:
   schedule:
-    # 每天北京时间 08:00 = UTC 00:00（GitHub cron 固定为 UTC 时区）
-    - cron: "0 0 * * *"
+    # 每天北京时间 08:00 / 13:00 / 20:00 = UTC 00:00 / 05:00 / 12:00（GitHub cron 固定 UTC）
+    - cron: "0 0,5,12 * * *"
   workflow_dispatch:
     inputs:
       deploy:
@@ -24,12 +26,13 @@ on:
         type: boolean
         default: true
 
-# GITHUB_TOKEN 需要写权限才能把生成的文件提交回仓库；
+# GITHUB_TOKEN 需要写权限才能把生成的文件提交回仓库、创建告警 Issue；
 # pages/id-token 权限是官方 Pages 部署 action（deploy-pages）必需
 permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 # 防止上一次运行还没结束、下一次定时触发时并发冲突
 concurrency:
@@ -39,7 +42,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -53,8 +57,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: 生成静态快照
-        run: python3 scripts/build_snapshot.py --out public/index.html
+      - name: 抓取公众号文章（搜狗微信搜索）
+        # 公众号源失败不阻断快照发布（静默降级，仅 aihot 数据）；
+        # 连续 2 天全部失败时由下方告警步骤创建 Issue
+        id: wechat
+        continue-on-error: true
+        env:
+          SOGOU_COOKIE: ${{ secrets.SOGOU_COOKIE }}
+        run: python3 scripts/fetch_wechat.py --accounts accounts.json --out wechat_items.json --state wechat_state.json --per-account 5 --days 7
+
+      - name: 生成静态快照（aihot API + 公众号合并）
+        run: python3 scripts/build_snapshot.py --out public/index.html --wechat-json wechat_items.json
 
       - name: 校验快照（日报/周报均有数据且 JSON 合法）
         run: |
@@ -66,14 +79,14 @@ jobs:
           for view in ("daily", "weekly"):
               p = data[view]
               assert p["total"] > 0, f"{view} 无数据"
-              print(f"{view}: total={p['total']} range={p['range']['label']}")
+              print(f"{view}: total={p['total']} range={p['range']['label']} mpStatus={p['mpStatus']['connected']}")
           EOF
 
-      - name: 提交快照回仓库（若内容有变化）
+      - name: 提交快照与抓取状态回仓库（若内容有变化）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/index.html
+          git add public/index.html wechat_state.json
           if git diff --cached --quiet; then
             echo "快照无变化，跳过提交"
           else
@@ -81,6 +94,32 @@ jobs:
             # 先拉取远端（避免与他人/并发运行的提交冲突），再推送
             git pull --rebase origin main
             git push
+          fi
+
+      - name: 公众号源断流告警（连续 2 天失败时创建 Issue）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fails=$(python3 -c "import json;print(json.load(open('wechat_state.json')).get('consecutive_failures',0))" 2>/dev/null || echo 0)
+          echo "公众号源连续失败计数: $fails"
+          if [ "$fails" -ge 2 ]; then
+            # 去重：已有同类未关闭 Issue 时不再重复创建
+            existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "公众号源连续断流 in:title" --json number -q length)
+            if [ "$existing" -eq 0 ]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "⚠️ 公众号源连续断流（$fails 次连续失败）" \
+                --body "公众号抓取源已连续 $fails 次运行全部失败。
+
+          常见原因与处理：
+          1. **SOGOU_COOKIE 过期**（最常见，约 2-4 周过期）：浏览器登录 weixin.sogou.com → F12 → Network → 任意请求的 Cookie 头整段复制 → 更新仓库 Settings → Secrets → SOGOU_COOKIE
+          2. **搜狗反爬升级**：降低抓取频率（改 workflow cron）或改用付费 RSS 中转服务（见 docs/DEPLOY_WORKFLOW.md 退路章节）
+          3. **Actions IP 被风控**：配置 Cookie 后通常可恢复
+
+          查看最近运行日志：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions"
+              echo "已创建断流告警 Issue"
+            else
+              echo "已存在断流告警 Issue，跳过重复创建"
+            fi
           fi
 
       - name: 准备 Pages 产物（站点根目录）

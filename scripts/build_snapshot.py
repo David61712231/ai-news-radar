@@ -5,13 +5,15 @@
     python3 scripts/build_snapshot.py [--out public/index.html]
         [--template templates/index.template.html]
         [--api-base https://aihot.virxact.com]
+        [--wechat-json wechat_items.json]
         [--days 7]
 
 流程:
     1. 分页抓取 /api/public/items（扁平条目流，天然去重）
-    2. 日报 = 最近有内容的北京日期当天条目；周报 = 该日期前 N 天
-    3. 按六版块分组、全局连续编号、北京时间人话时间
-    4. 用模板渲染出单文件 HTML（DATA 内嵌）
+    2. 合并公众号抓取结果（wechat_items.json，可选）：URL 归一化去重 + 关键词分类
+    3. 日报 = 最近有内容的北京日期当天条目；周报 = 该日期前 N 天
+    4. 按六版块分组、全局连续编号、北京时间人话时间
+    5. 用模板渲染出单文件 HTML（DATA 内嵌）
 
 纯标准库实现，Windows / Linux / macOS 均可运行。
 """
@@ -38,6 +40,50 @@ BJ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 WEEKDAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 
 MAX_PAGES = 20  # 分页上限（每页 50 条），防止死循环
+
+# 公众号文章六版块分类规则（按顺序匹配，命中即归入；兜底「行业动态」）
+WECHAT_CATEGORY_RULES = [
+    ("模型发布/更新", ["模型", "开源", "权重", "参数", "benchmark", "评测", "GPT", "Qwen", "Kimi", "Claude", "Gemini", "DeepSeek", "GLM", "大模型", "多模态", "tokenizer"]),
+    ("论文研究", ["论文", "paper", "arxiv", "SOTA", "研究", "基准测试"]),
+    ("AI泛娱乐新闻", ["娱乐", "游戏", "影视", "视频生成", "音乐", "虚拟人", "数字人"]),
+    ("产品发布/更新", ["功能", "App", "Agent", "agent", "工具", "平台", "上线", "API", "接入", "助手", "Copilot", "升级", "插件", "组件"]),
+    ("行业动态", ["融资", "投资", "估值", "市场", "监管", "政策", "诉讼", "IPO", "营收", "财报", "合作", "战略"]),
+]
+
+
+def classify_wechat(item: dict) -> str:
+    """公众号文章按关键词规则归入六版块。"""
+    text = ((item.get("title") or "") + " " + (item.get("summary") or "")).lower()
+    for label, kws in WECHAT_CATEGORY_RULES:
+        if any(k.lower() in text for k in kws):
+            return label
+    return "技巧与观点"
+
+
+def norm_url(url: str) -> str:
+    """URL 归一化（去 query 参数），用于跨源去重。"""
+    return (url or "").split("?")[0].rstrip("/").lower()
+
+
+def load_wechat(path: str) -> list[dict]:
+    """读取 fetch_wechat.py 的产出（可缺省），返回已分类的公众号条目。"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not data.get("ok"):
+        return []
+    out = []
+    for it in data.get("items") or []:
+        if not it.get("title") or not it.get("publishedAt"):
+            continue
+        it = dict(it)
+        it["category"] = classify_wechat(it)
+        it["sourceType"] = "wechat"
+        it["mpName"] = (it.get("source") or "").replace("公众号：", "") or None
+        out.append(it)
+    return out
 
 
 def fetch_items(api_base: str, since_bj: datetime) -> list[dict]:
@@ -91,21 +137,25 @@ def fmt_time_text(dt: datetime, today: datetime) -> str:
 
 
 def build_item(raw: dict, num: int, today: datetime) -> dict:
-    """API item -> 模板 item 结构。"""
+    """API item -> 模板 item 结构。category 已是中文六版块时直通。"""
     published = to_bj(raw.get("publishedAt") or "")
-    category = CATEGORY_MAP.get(raw.get("category") or "", "行业动态")
+    cat = raw.get("category") or ""
+    category = cat if cat in SECTIONS else CATEGORY_MAP.get(cat, "行业动态")
     url = raw.get("url") or raw.get("permalink") or ""
     source = raw.get("source") or raw.get("attribution", {}).get("source") or "AI HOT"
+    # 修复历史 bug：aihot 数据里 source 以「公众号：」开头的条目应标记为 wechat，
+    # 否则前端「仅看公众号」筛选（sourceType===wechat）永远为空
+    source_type = raw.get("sourceType") or ("wechat" if str(source).startswith("公众号：") else "aihot")
     return {
-        "id": f"aihot:{raw.get('id')}",
+        "id": f"aihot:{raw.get('id')}" if not str(raw.get("id") or "").startswith("wechat:") else raw.get("id"),
         "title": raw.get("title") or "",
         "summary": raw.get("summary") or "",
         "url": url,
         "source": source,
-        "sourceType": "aihot",
+        "sourceType": source_type,
         "category": category,
         "publishedAt": raw.get("publishedAt") or "",
-        "mpName": None,
+        "mpName": raw.get("mpName") if "mpName" in raw else None,
         "num": num,
         "timeText": fmt_time_text(published, today),
     }
@@ -122,7 +172,7 @@ def group_sections(items: list[dict]) -> list[dict]:
     ]
 
 
-def build_view(view: str, items: list[dict], day: datetime, days: int, generated_at: datetime) -> dict:
+def build_view(view: str, items: list[dict], day: datetime, days: int, generated_at: datetime, mp_status: dict) -> dict:
     """组装 daily / weekly 视图。items 需已按 publishedAt 降序。"""
     start = day - timedelta(days=days - 1)
     end = day + timedelta(days=1)
@@ -141,10 +191,7 @@ def build_view(view: str, items: list[dict], day: datetime, days: int, generated
         "lead": None,
         "sections": sections,
         "stats": [{"label": s["label"], "count": s["count"]} for s in sections],
-        "mpStatus": {
-            "connected": False,
-            "note": "未检测到本地公众号聚合 RSS（URLError），仅显示 aihot 数据",
-        },
+        "mpStatus": mp_status,
         "generatedAt": generated_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -169,6 +216,8 @@ def main() -> int:
     parser.add_argument("--out", default="public/index.html")
     parser.add_argument("--template", default="templates/index.template.html")
     parser.add_argument("--api-base", default="https://aihot.virxact.com")
+    parser.add_argument("--wechat-json", default="wechat_items.json",
+                        help="fetch_wechat.py 的产出（不存在时自动跳过）")
     parser.add_argument("--days", type=int, default=7, help="周报窗口天数（默认 7）")
     args = parser.parse_args()
 
@@ -194,11 +243,32 @@ def main() -> int:
         deduped.append(i)
     items = deduped
 
+    # 合并公众号抓取结果：URL 归一化 + 标题去重，避免与 aihot 已有公众号内容重复
+    wechat_items = load_wechat(args.wechat_json)
+    if wechat_items:
+        seen_urls = {norm_url(i.get("url") or i.get("permalink") or "") for i in items}
+        seen_titles = {(i.get("title") or "").strip().lower() for i in items}
+        merged = 0
+        for w in wechat_items:
+            if norm_url(w.get("url") or "") in seen_urls:
+                continue
+            if (w.get("title") or "").strip().lower() in seen_titles:
+                continue
+            items.append(w)
+            merged += 1
+        items.sort(key=lambda i: to_bj(i.get("publishedAt") or ""), reverse=True)
+        print(f"公众号源：获取 {len(wechat_items)} 条，去重后合并 {merged} 条")
+        mp_status = {"connected": True,
+                     "note": f"已接入公众号追踪源（GitHub Actions 搜狗抓取，本次合并 {merged} 条新文章）"}
+    else:
+        mp_status = {"connected": False,
+                     "note": "公众号追踪源本次未返回数据（搜狗抓取失败或无新文章），仅显示 aihot 数据"}
+
     latest_day = to_bj(items[0].get("publishedAt") or "").date()
     generated_at = datetime.now(timezone.utc)
     data = {
-        "daily": build_view("daily", items, datetime.combine(latest_day, datetime.min.time(), tzinfo=BJ), 1, generated_at),
-        "weekly": build_view("weekly", items, datetime.combine(latest_day, datetime.min.time(), tzinfo=BJ), args.days, generated_at),
+        "daily": build_view("daily", items, datetime.combine(latest_day, datetime.min.time(), tzinfo=BJ), 1, generated_at, mp_status),
+        "weekly": build_view("weekly", items, datetime.combine(latest_day, datetime.min.time(), tzinfo=BJ), args.days, generated_at, mp_status),
     }
     render(args.template, args.out, data)
     return 0

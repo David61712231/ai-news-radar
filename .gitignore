@@ -24,6 +24,7 @@
 __pycache__/
 *.pyc
 /_site/
+wechat_items.json
 
 # debug
 npm-debug.log*
