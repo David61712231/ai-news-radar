@@ -1,8 +1,8 @@
 {
  "consecutive_failures": 0,
- "last_success_at": "2026-08-13T01:57:45Z",
- "last_run_at": "2026-08-13T01:57:45Z",
- "last_ok_accounts": 11,
+ "last_success_at": "2026-08-13T06:20:56Z",
+ "last_run_at": "2026-08-13T06:20:56Z",
+ "last_ok_accounts": 15,
  "last_fail_accounts": 0,
- "last_items": 8
+ "last_items": 15
 }
