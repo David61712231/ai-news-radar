@@ -151,30 +151,72 @@ def parse_jump_url(page: str) -> str:
     return ""
 
 
-def resolve_real_url(sogou_link: str, cookie: str = "") -> str:
+def normalize_sogou_url(raw_url: str) -> tuple[str, str]:
+    """规范化搜狗链接：补全相对路径并对不可直接请求字符做编码。"""
+    link = html.unescape((raw_url or "").strip())
+    if not link:
+        return "", "invalid_sogou_url"
+    if link.startswith("//"):
+        link = "https:" + link
+    elif link.startswith("/"):
+        link = "https://weixin.sogou.com" + link
+    try:
+        parsed = urllib.parse.urlsplit(link)
+    except ValueError:
+        return "", "invalid_sogou_url"
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return "", "invalid_sogou_url"
+    if any(ord(ch) < 32 or ch == " " for ch in parsed.netloc):
+        return "", "invalid_sogou_url"
+    safe_path = urllib.parse.quote(parsed.path or "/", safe="/%:@-._~!$&'()*+,;=")
+    safe_query = urllib.parse.quote(parsed.query, safe="=&;%:+,/?@-._~!$'()*[]")
+    safe_fragment = urllib.parse.quote(parsed.fragment, safe="-._~!$&'()*+,;=:@/?")
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, safe_path, safe_query, safe_fragment)), ""
+
+
+def resolve_real_url(sogou_link: str, cookie: str = "") -> tuple[str | None, str | None]:
     """跟踪搜狗跳转链，解析出 mp.weixin.qq.com 真实文章链接。
 
     搜狗中转链有时效（约数天到十几天），快照里必须存真实链接。
-    跳转页为 JS 重定向（URL 拆片拼接），需携带搜狗会话 Cookie 访问。
-    解析失败时退回原搜狗链接（可打开但有过期风险）。
+    跳转页为 JS 重定向（URL 拆片拼接），需携带搜狗会话 Cookie 访问；
+    仅当成功解析出 https://mp.weixin.qq.com/ 链接时才返回。
     """
-    if "mp.weixin.qq.com" in sogou_link:
-        return sogou_link
+    direct = html.unescape((sogou_link or "").strip())
+    if direct.startswith("https://mp.weixin.qq.com/"):
+        return direct, None
+    if direct.startswith("http://mp.weixin.qq.com/"):
+        return "https://" + direct[len("http://"):], None
+    safe_sogou_url, reason = normalize_sogou_url(sogou_link)
+    if reason:
+        return None, reason
     try:
-        page = http_get(sogou_link, cookie=cookie, referer="https://weixin.sogou.com/")
+        page = http_get(safe_sogou_url, cookie=cookie, referer="https://weixin.sogou.com/")
         if is_antispider(page):
-            print("    跳转链触发反爬（会话 Cookie 可能失效），保留搜狗链接", file=sys.stderr)
-            return sogou_link
+            return None, "antispider"
         real = parse_jump_url(page)
-        if real and "mp.weixin.qq.com" in real:
-            return real.split("@")[-1] if "@" in real else real
+        if not real:
+            return None, "resolve_failed"
+        real = real.split("@")[-1] if "@" in real else real
+        if real.startswith("http://mp.weixin.qq.com/"):
+            real = "https://" + real[len("http://"):]
+        if real.startswith("https://mp.weixin.qq.com/"):
+            return real, None
+        return None, "resolve_failed"
     except Exception as exc:  # noqa: BLE001 - 跳转解析失败不应中断整体抓取
-        print(f"    跳转链解析失败（保留搜狗链接）: {exc}", file=sys.stderr)
-    return sogou_link
+        print(f"    跳转链解析失败: {exc}", file=sys.stderr)
+    return None, "resolve_failed"
 
 
-def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> tuple[list[dict], int, int]:
-    items, ok_count, fail_count = [], 0, 0
+def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> tuple[list[dict], dict, list[dict]]:
+    items = []
+    stats = {
+        "ok_accounts": 0,
+        "fail_accounts": 0,
+        "candidate_count": 0,
+        "resolved_count": 0,
+        "filtered_count": 0,
+    }
+    failed_candidates: list[dict] = []
     since_ts = int(time.time()) - days * 86400
     for name in accounts:
         try:
@@ -183,18 +225,48 @@ def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> 
             if is_antispider(page):
                 raise RuntimeError("触发搜狗反爬（验证码页），Cookie 可能过期或缺失")
             results = parse_results(page, name, per_account, since_ts)
+            stats["candidate_count"] += len(results)
+            kept = 0
             for r in results:
-                r["url"] = resolve_real_url(r["sogouLink"], cookie)
-                r["id"] = "wechat:" + hashlib.md5(r["url"].encode("utf-8")).hexdigest()[:12]
+                real_url, reason = resolve_real_url(r.get("sogouLink", ""), cookie)
+                if real_url:
+                    it = dict(r)
+                    it["url"] = real_url
+                    it["id"] = "wechat:" + hashlib.md5(real_url.encode("utf-8")).hexdigest()[:12]
+                    items.append(it)
+                    stats["resolved_count"] += 1
+                    kept += 1
+                else:
+                    stats["filtered_count"] += 1
+                    failed_candidates.append({
+                        "account": name,
+                        "title": r.get("title", ""),
+                        "sogouLink": r.get("sogouLink", ""),
+                        "reason": reason or "resolve_failed",
+                    })
                 time.sleep(random.uniform(0.3, 0.8))
-            items.extend(results)
-            ok_count += 1
-            print(f"  [OK] {name}: {len(results)} 篇")
+            stats["ok_accounts"] += 1
+            print(f"  [OK] {name}: 搜索候选 {len(results)} 篇，原文解析成功 {kept} 篇")
         except Exception as exc:  # noqa: BLE001 - 单账号失败不影响其他账号
-            fail_count += 1
+            stats["fail_accounts"] += 1
             print(f"  [FAIL] {name}: {exc}", file=sys.stderr)
         time.sleep(random.uniform(1.0, 3.0))
-    return items, ok_count, fail_count
+    return items, stats, failed_candidates
+
+
+def summarize_failures(failed_candidates: list[dict], max_items: int = 20) -> tuple[dict, list[dict]]:
+    reasons: dict[str, int] = {}
+    compact = []
+    for fc in failed_candidates:
+        reason = (fc.get("reason") or "resolve_failed").strip() or "resolve_failed"
+        reasons[reason] = reasons.get(reason, 0) + 1
+        if len(compact) < max_items:
+            compact.append({
+                "account": fc.get("account", ""),
+                "title": fc.get("title", ""),
+                "reason": reason,
+            })
+    return reasons, compact
 
 
 def main() -> int:
@@ -216,7 +288,9 @@ def main() -> int:
     cookie = os.environ.get("SOGOU_COOKIE", "")
     build_session(cookie)  # 无 SOGOU_COOKIE 时自动用匿名会话 Cookie（首页预热获取）
     print(f"开始抓取 {len(accounts)} 个公众号（Cookie: {'登录态' if cookie else '匿名会话'}，窗口: 近 {args.days} 天）")
-    items, ok_count, fail_count = fetch_all(accounts, cookie, args.per_account, args.days)
+    if not cookie:
+        print("提示：未配置 SOGOU_COOKIE，当前为匿名搜狗会话，原文 URL 解析可能受限。", file=sys.stderr)
+    items, stats, failed_candidates = fetch_all(accounts, cookie, args.per_account, args.days)
 
     now = datetime.now(timezone.utc)
     # 读取既有 state，更新连续失败计数
@@ -227,24 +301,37 @@ def main() -> int:
     except (OSError, json.JSONDecodeError):
         pass
 
-    success = ok_count > 0 and len(items) > 0
+    success = stats["resolved_count"] > 0
     if success:
         state["consecutive_failures"] = 0
         state["last_success_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     else:
         state["consecutive_failures"] = int(state.get("consecutive_failures", 0)) + 1
     state["last_run_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    state["last_ok_accounts"] = ok_count
-    state["last_fail_accounts"] = fail_count
+    state["last_ok_accounts"] = stats["ok_accounts"]
+    state["last_fail_accounts"] = stats["fail_accounts"]
+    state["last_candidate_count"] = stats["candidate_count"]
+    state["last_resolved_count"] = stats["resolved_count"]
+    state["last_filtered_count"] = stats["filtered_count"]
     state["last_items"] = len(items)
+    failure_reasons, compact_failed = summarize_failures(failed_candidates, max_items=20)
+    state["last_failure_reasons"] = failure_reasons
+    state["last_failed_candidates"] = compact_failed
 
     with open(args.out, "w", encoding="utf-8") as f:
-        json.dump({"fetchedAt": state["last_run_at"], "ok": success, "items": items},
+        json.dump({"fetchedAt": state["last_run_at"],
+                   "ok": success,
+                   "cookieConfigured": bool(cookie),
+                   "sessionMode": "logged_in" if cookie else "anonymous",
+                   "stats": stats,
+                   "failedCandidates": failed_candidates,
+                   "items": items},
                   f, ensure_ascii=False, indent=1)
     with open(args.state, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=1)
 
-    print(f"完成：成功账号 {ok_count}/{len(accounts)}，共 {len(items)} 篇文章，"
+    print(f"完成：账号搜索成功 {stats['ok_accounts']}/{len(accounts)}，候选 {stats['candidate_count']} 条，"
+          f"原文解析成功 {stats['resolved_count']} 条，过滤失败 {stats['filtered_count']} 条，"
           f"连续失败计数 {state['consecutive_failures']}")
     if not success:
         print("警告：本次公众号源全部失败（若持续失败将触发 Issue 告警）", file=sys.stderr)

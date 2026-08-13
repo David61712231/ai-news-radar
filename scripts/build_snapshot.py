@@ -65,15 +65,26 @@ def norm_url(url: str) -> str:
     return (url or "").split("?")[0].rstrip("/").lower()
 
 
-def load_wechat(path: str) -> list[dict]:
-    """读取 fetch_wechat.py 的产出（可缺省），返回已分类的公众号条目。"""
+def load_wechat(path: str) -> tuple[list[dict], dict]:
+    """读取 fetch_wechat.py 产出（可缺省），返回已分类条目与抓取元信息。"""
+    meta = {
+        "ok": False,
+        "cookieConfigured": False,
+        "sessionMode": "anonymous",
+        "stats": {"ok_accounts": 0, "candidate_count": 0, "resolved_count": 0, "filtered_count": 0},
+    }
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
-        return []
+        return [], meta
+    meta["ok"] = bool(data.get("ok"))
+    meta["cookieConfigured"] = bool(data.get("cookieConfigured"))
+    meta["sessionMode"] = data.get("sessionMode") or ("logged_in" if meta["cookieConfigured"] else "anonymous")
+    if isinstance(data.get("stats"), dict):
+        meta["stats"].update(data["stats"])
     if not data.get("ok"):
-        return []
+        return [], meta
     out = []
     for it in data.get("items") or []:
         if not it.get("title") or not it.get("publishedAt"):
@@ -83,7 +94,7 @@ def load_wechat(path: str) -> list[dict]:
         it["sourceType"] = "wechat"
         it["mpName"] = (it.get("source") or "").replace("公众号：", "") or None
         out.append(it)
-    return out
+    return out, meta
 
 
 def fetch_items(api_base: str, since_bj: datetime) -> list[dict]:
@@ -244,7 +255,15 @@ def main() -> int:
     items = deduped
 
     # 合并公众号抓取结果：URL 归一化 + 标题去重，避免与 aihot 已有公众号内容重复
-    wechat_items = load_wechat(args.wechat_json)
+    wechat_items, wechat_meta = load_wechat(args.wechat_json)
+    wechat_stats = wechat_meta.get("stats") or {}
+    ok_accounts = int(wechat_stats.get("ok_accounts") or 0)
+    candidate_count = int(wechat_stats.get("candidate_count") or 0)
+    resolved_count = int(wechat_stats.get("resolved_count") or 0)
+    filtered_count = int(wechat_stats.get("filtered_count") or 0)
+    anonymous = (wechat_meta.get("sessionMode") == "anonymous")
+    stats_text = (f"搜狗账号搜索成功 {ok_accounts} 个，候选 {candidate_count} 条，"
+                  f"成功解析原文 {resolved_count} 条，过滤 {filtered_count} 条")
     if wechat_items:
         seen_urls = {norm_url(i.get("url") or i.get("permalink") or "") for i in items}
         seen_titles = {(i.get("title") or "").strip().lower() for i in items}
@@ -258,11 +277,15 @@ def main() -> int:
             merged += 1
         items.sort(key=lambda i: to_bj(i.get("publishedAt") or ""), reverse=True)
         print(f"公众号源：获取 {len(wechat_items)} 条，去重后合并 {merged} 条")
-        mp_status = {"connected": True,
-                     "note": f"已接入公众号追踪源（GitHub Actions 搜狗抓取，本次合并 {merged} 条新文章）"}
+        note = f"已解析公众号原文 URL（{stats_text}，本次去重后合并 {merged} 条）"
+        if anonymous:
+            note += "；当前为匿名搜狗会话，原文 URL 解析可能受限"
+        mp_status = {"connected": resolved_count > 0, "note": note}
     else:
-        mp_status = {"connected": False,
-                     "note": "公众号追踪源本次未返回数据（搜狗抓取失败或无新文章），仅显示 aihot 数据"}
+        note = f"公众号追踪源本次未返回可发布原文链接（{stats_text}），仅显示 aihot 数据"
+        if anonymous:
+            note += "；当前为匿名搜狗会话，原文 URL 解析可能受限"
+        mp_status = {"connected": False, "note": note}
 
     latest_day = to_bj(items[0].get("publishedAt") or "").date()
     generated_at = datetime.now(timezone.utc)
