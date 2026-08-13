@@ -17,6 +17,7 @@ npm run build
 ```
 
 This starter does not use `wrangler.jsonc`.
+微信公众号名单维护：编辑仓库根目录 `accounts.json` 的 `accounts` 数组，仅填写可在搜狗微信搜索到的公众号名称。
 
 ## Included Shape
 
