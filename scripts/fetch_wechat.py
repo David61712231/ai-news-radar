@@ -254,6 +254,21 @@ def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> 
     return items, stats, failed_candidates
 
 
+def summarize_failures(failed_candidates: list[dict], max_items: int = 20) -> tuple[dict, list[dict]]:
+    reasons: dict[str, int] = {}
+    compact = []
+    for fc in failed_candidates:
+        reason = (fc.get("reason") or "resolve_failed").strip() or "resolve_failed"
+        reasons[reason] = reasons.get(reason, 0) + 1
+        if len(compact) < max_items:
+            compact.append({
+                "account": fc.get("account", ""),
+                "title": fc.get("title", ""),
+                "reason": reason,
+            })
+    return reasons, compact
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="通过搜狗微信搜索抓取公众号文章")
     parser.add_argument("--accounts", default="accounts.json")
@@ -299,6 +314,9 @@ def main() -> int:
     state["last_resolved_count"] = stats["resolved_count"]
     state["last_filtered_count"] = stats["filtered_count"]
     state["last_items"] = len(items)
+    failure_reasons, compact_failed = summarize_failures(failed_candidates, max_items=20)
+    state["last_failure_reasons"] = failure_reasons
+    state["last_failed_candidates"] = compact_failed
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump({"fetchedAt": state["last_run_at"],

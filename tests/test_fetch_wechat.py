@@ -1,5 +1,7 @@
 import importlib.util
+import json
 import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -52,6 +54,44 @@ class FetchWechatTests(unittest.TestCase):
         self.assertEqual(stats["resolved_count"], 0)
         self.assertEqual(stats["filtered_count"], 1)
         self.assertEqual(failed_candidates[0]["reason"], "resolve_failed")
+
+    def test_main_writes_failure_summary_to_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = pathlib.Path(td)
+            accounts = base / "accounts.json"
+            out_json = base / "wechat_items.json"
+            state_json = base / "wechat_state.json"
+            accounts.write_text('{"accounts":[{"name":"A"}]}', encoding="utf-8")
+            state_json.write_text('{"consecutive_failures":0}', encoding="utf-8")
+            failed = (
+                [{"account": "A", "title": f"t{i}", "reason": "resolve_failed"} for i in range(12)]
+                + [{"account": "A", "title": f"a{i}", "reason": "antispider"} for i in range(7)]
+                + [{"account": "A", "title": f"b{i}", "reason": "invalid_sogou_url"} for i in range(5)]
+            )
+            fake_stats = {
+                "ok_accounts": 1,
+                "fail_accounts": 0,
+                "candidate_count": len(failed),
+                "resolved_count": 0,
+                "filtered_count": len(failed),
+            }
+            with mock.patch.object(FETCH_WECHAT, "build_session", return_value=None), \
+                    mock.patch.object(FETCH_WECHAT, "fetch_all", return_value=([], fake_stats, failed)), \
+                    mock.patch("sys.argv", ["fetch_wechat.py", "--accounts", str(accounts), "--out", str(out_json),
+                                            "--state", str(state_json)]):
+                rc = FETCH_WECHAT.main()
+
+            self.assertEqual(rc, 0)
+            state_data = json.loads(state_json.read_text(encoding="utf-8"))
+            self.assertEqual(
+                state_data["last_failure_reasons"],
+                {"resolve_failed": 12, "antispider": 7, "invalid_sogou_url": 5},
+            )
+            self.assertEqual(len(state_data["last_failed_candidates"]), 20)
+            self.assertEqual(
+                sorted(state_data["last_failed_candidates"][0].keys()),
+                ["account", "reason", "title"],
+            )
 
 
 if __name__ == "__main__":
