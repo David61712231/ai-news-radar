@@ -1,13 +1,86 @@
 {
- "consecutive_failures": 1,
+ "consecutive_failures": 2,
  "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-13T07:58:11Z",
- "last_ok_accounts": 0,
- "last_fail_accounts": 15,
+ "last_run_at": "2026-08-13T08:08:46Z",
+ "last_ok_accounts": 15,
+ "last_fail_accounts": 0,
  "last_items": 0,
- "last_candidate_count": 0,
+ "last_candidate_count": 14,
  "last_resolved_count": 0,
- "last_filtered_count": 0,
- "last_failure_reasons": {},
- "last_failed_candidates": []
+ "last_filtered_count": 14,
+ "last_failure_reasons": {
+  "antispider": 14
+ },
+ "last_failed_candidates": [
+  {
+   "account": "机器之心",
+   "title": "机器之心对话罗平|机器人是具身大模型的「用户」:超维动力如何打通从人类经验到机器人行动?",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "才华横溢!自用款【菜瓜数据】竞价异动都不会看?",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "DeepSeek招土木工程师;腾讯参投!林俊旸深夜官宣新公司:做下一代AI智能体;宇树科技中签号出炉:共19414个丨雷峰早报",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "Anthropic创始人的「抽象」B面:拍墓碑广告、研究AI末日、对赚钱毫无兴趣",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "字节跳动反对「蒸馏」,到底是在反对什么?",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "估值20亿美元!AI大神林俊旸创业,红杉、腾讯抢着投",
+   "reason": "antispider"
+  },
+  {
+   "account": "Founder Park",
+   "title": "Waffo 出席 Founder Park AGI Playground",
+   "reason": "antispider"
+  },
+  {
+   "account": "瑞恩资本",
+   "title": "瑞恩百胜中国(09987): 上半年收入增11.1%,肯德基收入增10.3%、门店达13789家,必胜客收入增8.6%、门店达4549家",
+   "reason": "antispider"
+  },
+  {
+   "account": "DeepTech 深科技",
+   "title": "deep‑tech",
+   "reason": "antispider"
+  },
+  {
+   "account": "华尔街见闻",
+   "title": "华尔街见闻早餐 2026年8月13日",
+   "reason": "antispider"
+  },
+  {
+   "account": "华尔街见闻",
+   "title": "两个知识库+一个Skill:华尔街见闻把财经研究带进ima",
+   "reason": "antispider"
+  },
+  {
+   "account": "华尔街见闻",
+   "title": "华尔街见闻早餐2026年8月7日",
+   "reason": "antispider"
+  },
+  {
+   "account": "数字生命卡兹克",
+   "title": "AI最新热点-2026年08月12日14点",
+   "reason": "antispider"
+  },
+  {
+   "account": "Elsewhere 别处发生",
+   "title": "突然悟了如何逆向调教小红书算法 | 已验证成功~",
+   "reason": "antispider"
+  }
+ ]
 }
