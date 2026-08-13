@@ -1,15 +1,15 @@
 {
- "consecutive_failures": 2,
+ "consecutive_failures": 3,
  "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-13T08:08:46Z",
+ "last_run_at": "2026-08-13T13:14:58Z",
  "last_ok_accounts": 15,
  "last_fail_accounts": 0,
  "last_items": 0,
- "last_candidate_count": 14,
+ "last_candidate_count": 11,
  "last_resolved_count": 0,
- "last_filtered_count": 14,
+ "last_filtered_count": 11,
  "last_failure_reasons": {
-  "antispider": 14
+  "antispider": 11
  },
  "last_failed_candidates": [
   {
@@ -19,7 +19,7 @@
   },
   {
    "account": "Z Finance",
-   "title": "才华横溢!自用款【菜瓜数据】竞价异动都不会看?",
+   "title": "Z Waves|专访百度搭子负责人李景秋:一个入口调度所有软件,百度要重做一遍白领的工作方式",
    "reason": "antispider"
   },
   {
@@ -29,17 +29,12 @@
   },
   {
    "account": "Z Finance",
+   "title": "毕顿留学专访第7期|哥大&南加大|金融工程&运筹学&量化金融&人工智能与商业分析offer|2026fall Z同学专访",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
    "title": "Anthropic创始人的「抽象」B面:拍墓碑广告、研究AI末日、对赚钱毫无兴趣",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "字节跳动反对「蒸馏」,到底是在反对什么?",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "估值20亿美元!AI大神林俊旸创业,红杉、腾讯抢着投",
    "reason": "antispider"
   },
   {
@@ -59,22 +54,12 @@
   },
   {
    "account": "华尔街见闻",
-   "title": "华尔街见闻早餐 2026年8月13日",
-   "reason": "antispider"
-  },
-  {
-   "account": "华尔街见闻",
    "title": "两个知识库+一个Skill:华尔街见闻把财经研究带进ima",
    "reason": "antispider"
   },
   {
-   "account": "华尔街见闻",
-   "title": "华尔街见闻早餐2026年8月7日",
-   "reason": "antispider"
-  },
-  {
    "account": "数字生命卡兹克",
-   "title": "AI最新热点-2026年08月12日14点",
+   "title": "AI 写的中文为什么都是同一张脸?AI领域知名博主卡兹克把根治方法开源了!",
    "reason": "antispider"
   },
   {
