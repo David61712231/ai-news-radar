@@ -1,8 +1,13 @@
 {
- "consecutive_failures": 0,
+ "consecutive_failures": 1,
  "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-13T06:20:56Z",
- "last_ok_accounts": 15,
- "last_fail_accounts": 0,
- "last_items": 15
+ "last_run_at": "2026-08-13T07:58:11Z",
+ "last_ok_accounts": 0,
+ "last_fail_accounts": 15,
+ "last_items": 0,
+ "last_candidate_count": 0,
+ "last_resolved_count": 0,
+ "last_filtered_count": 0,
+ "last_failure_reasons": {},
+ "last_failed_candidates": []
 }
