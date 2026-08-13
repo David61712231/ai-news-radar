@@ -1,0 +1,58 @@
+import importlib.util
+import pathlib
+import unittest
+from unittest import mock
+
+
+MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "fetch_wechat.py"
+SPEC = importlib.util.spec_from_file_location("fetch_wechat", MODULE_PATH)
+FETCH_WECHAT = importlib.util.module_from_spec(SPEC)
+assert SPEC and SPEC.loader
+SPEC.loader.exec_module(FETCH_WECHAT)
+
+
+class FetchWechatTests(unittest.TestCase):
+    def test_relative_sogou_link_with_spaces_is_safely_requested(self):
+        captured = {}
+
+        def fake_http_get(url, cookie="", referer="", timeout=25):
+            captured["url"] = url
+            return "url += 'https://mp.weixin.qq.com/s?__biz=abc123';"
+
+        with mock.patch.object(FETCH_WECHAT, "http_get", side_effect=fake_http_get):
+            real_url, reason = FETCH_WECHAT.resolve_real_url(
+                "/link?url=https%3A%2F%2Fmp.weixin.qq.com%2Fs%3Fid%3D1&query=Z Finance",
+                cookie="",
+            )
+
+        self.assertEqual(reason, None)
+        self.assertEqual(real_url, "https://mp.weixin.qq.com/s?__biz=abc123")
+        self.assertEqual(
+            captured["url"],
+            "https://weixin.sogou.com/link?url=https%3A%2F%2Fmp.weixin.qq.com%2Fs%3Fid%3D1&query=Z%20Finance",
+        )
+
+    def test_resolve_failure_candidate_is_not_output(self):
+        fake_candidates = [{
+            "title": "t1",
+            "summary": "s1",
+            "sogouLink": "/link?query=Z Finance",
+            "source": "公众号：Z Finance",
+            "publishedAt": "2026-01-01T00:00:00.000Z",
+        }]
+        with mock.patch.object(FETCH_WECHAT, "http_get", return_value="<html>ok</html>"), \
+                mock.patch.object(FETCH_WECHAT, "parse_results", return_value=fake_candidates), \
+                mock.patch.object(FETCH_WECHAT, "resolve_real_url", return_value=(None, "resolve_failed")), \
+                mock.patch.object(FETCH_WECHAT.time, "sleep", return_value=None), \
+                mock.patch.object(FETCH_WECHAT.random, "uniform", return_value=0.0):
+            items, stats, failed_candidates = FETCH_WECHAT.fetch_all(["Z Finance"], "", per_account=5, days=7)
+
+        self.assertEqual(items, [])
+        self.assertEqual(stats["candidate_count"], 1)
+        self.assertEqual(stats["resolved_count"], 0)
+        self.assertEqual(stats["filtered_count"], 1)
+        self.assertEqual(failed_candidates[0]["reason"], "resolve_failed")
+
+
+if __name__ == "__main__":
+    unittest.main()
