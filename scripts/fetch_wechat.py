@@ -91,6 +91,12 @@ def is_antispider(page: str) -> bool:
     return ("antispider" in page) or ("请输入验证码" in page) or ("验证码" in page and "txt-box" not in page)
 
 
+def is_exact_account_match(expected: str, actual: str) -> bool:
+    """Accept only an explicitly identified, exact public-account name."""
+    normalize = lambda value: re.sub(r"\s+", "", (value or "")).casefold()
+    return bool(normalize(actual)) and normalize(expected) == normalize(actual)
+
+
 def parse_results(page: str, account: str, per_account: int, since_ts: int) -> list[dict]:
     """解析搜狗文章搜索结果页。
 
@@ -108,8 +114,9 @@ def parse_results(page: str, account: str, per_account: int, since_ts: int) -> l
         summary = html.unescape(RE_STRIP_TAG.sub("", ms.group(1)).strip()) if ms else ""
         ma = RE_ACCOUNT.search(block)
         src_account = html.unescape(RE_STRIP_TAG.sub("", ma.group(1)).strip()) if ma else ""
-        # 归属过滤：搜索「机器之心」可能混入提到该名的其他账号文章
-        if src_account and account not in src_account and src_account not in account:
+        # 搜狗搜索页会混入提及目标账号的文章；没有明确账号名或名称不完全
+        # 相同都不能标记为目标公众号，宁可漏掉也不能误归属。
+        if not is_exact_account_match(account, src_account):
             continue
         mt = RE_TIMESTAMP.search(block)
         if not mt:

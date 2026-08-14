@@ -14,6 +14,13 @@ SPEC.loader.exec_module(FETCH_WECHAT)
 
 
 class FetchWechatTests(unittest.TestCase):
+    def test_account_match_requires_an_explicit_exact_name(self):
+        self.assertTrue(FETCH_WECHAT.is_exact_account_match("机器之心", "机器之心"))
+        self.assertTrue(FETCH_WECHAT.is_exact_account_match("DeepTech 深科技", "DeepTech深科技"))
+        self.assertFalse(FETCH_WECHAT.is_exact_account_match("机器之心", "机器之心Pro"))
+        self.assertFalse(FETCH_WECHAT.is_exact_account_match("机器之心", "其他账号"))
+        self.assertFalse(FETCH_WECHAT.is_exact_account_match("机器之心", ""))
+
     def test_relative_sogou_link_with_spaces_is_safely_requested(self):
         captured = {}
 
