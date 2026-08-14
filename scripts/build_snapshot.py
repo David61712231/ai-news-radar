@@ -61,8 +61,18 @@ def classify_wechat(item: dict) -> str:
 
 
 def norm_url(url: str) -> str:
-    """URL 归一化（去 query 参数），用于跨源去重。"""
-    return (url or "").split("?")[0].rstrip("/").lower()
+    """URL 归一化，用于跨源去重。
+
+    公众号文章都使用 /s?__biz=...&mid=...&idx=... 这一形式，query
+    参数承载文章身份，不能像普通网页那样直接移除。
+    """
+    if not url:
+        return ""
+    parsed = urllib.parse.urlsplit(url)
+    base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/").lower()
+    if parsed.netloc.lower() == "mp.weixin.qq.com" and parsed.path == "/s":
+        return f"{base}?{parsed.query}"
+    return base
 
 
 def load_wechat(path: str) -> tuple[list[dict], dict]:
@@ -95,6 +105,31 @@ def load_wechat(path: str) -> tuple[list[dict], dict]:
         it["mpName"] = (it.get("source") or "").replace("公众号：", "") or None
         out.append(it)
     return out, meta
+
+
+def merge_wechat_items(items: list[dict], wechat_items: list[dict]) -> tuple[list[dict], int, int]:
+    """Merge WeChat candidates and retain tracked-account attribution on duplicates."""
+    by_url = {norm_url(i.get("url") or i.get("permalink") or ""): i for i in items}
+    by_title = {(i.get("title") or "").strip().lower(): i for i in items}
+    merged = 0
+    relabeled = 0
+    for wechat in wechat_items:
+        existing = by_url.get(norm_url(wechat.get("url") or ""))
+        if existing is None:
+            existing = by_title.get((wechat.get("title") or "").strip().lower())
+        if existing is not None:
+            # The API can carry the same article without the tracked account's
+            # name. Preserve its richer content, but show why it was selected.
+            existing["source"] = wechat.get("source") or existing.get("source")
+            existing["sourceType"] = "wechat"
+            existing["mpName"] = wechat.get("mpName")
+            relabeled += 1
+            continue
+        items.append(wechat)
+        by_url[norm_url(wechat.get("url") or "")] = wechat
+        by_title[(wechat.get("title") or "").strip().lower()] = wechat
+        merged += 1
+    return items, merged, relabeled
 
 
 def fetch_items(api_base: str, since_bj: datetime) -> list[dict]:
@@ -265,19 +300,10 @@ def main() -> int:
     stats_text = (f"搜狗账号搜索成功 {ok_accounts} 个，候选 {candidate_count} 条，"
                   f"成功解析原文 {resolved_count} 条，过滤 {filtered_count} 条")
     if wechat_items:
-        seen_urls = {norm_url(i.get("url") or i.get("permalink") or "") for i in items}
-        seen_titles = {(i.get("title") or "").strip().lower() for i in items}
-        merged = 0
-        for w in wechat_items:
-            if norm_url(w.get("url") or "") in seen_urls:
-                continue
-            if (w.get("title") or "").strip().lower() in seen_titles:
-                continue
-            items.append(w)
-            merged += 1
+        items, merged, relabeled = merge_wechat_items(items, wechat_items)
         items.sort(key=lambda i: to_bj(i.get("publishedAt") or ""), reverse=True)
-        print(f"公众号源：获取 {len(wechat_items)} 条，去重后合并 {merged} 条")
-        note = f"已解析公众号原文 URL（{stats_text}，本次去重后合并 {merged} 条）"
+        print(f"公众号源：获取 {len(wechat_items)} 条，新增 {merged} 条，标记已存在文章 {relabeled} 条")
+        note = f"已解析公众号原文 URL（{stats_text}，新增 {merged} 条、标记已存在文章 {relabeled} 条）"
         if anonymous:
             note += "；当前为匿名搜狗会话，原文 URL 解析可能受限"
         mp_status = {"connected": resolved_count > 0, "note": note}
