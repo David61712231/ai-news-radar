@@ -1,15 +1,15 @@
 {
- "consecutive_failures": 4,
+ "consecutive_failures": 5,
  "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-14T02:04:00Z",
+ "last_run_at": "2026-08-14T06:16:42Z",
  "last_ok_accounts": 10,
  "last_fail_accounts": 5,
  "last_items": 0,
- "last_candidate_count": 12,
+ "last_candidate_count": 11,
  "last_resolved_count": 0,
- "last_filtered_count": 12,
+ "last_filtered_count": 11,
  "last_failure_reasons": {
-  "antispider": 12
+  "antispider": 11
  },
  "last_failed_candidates": [
   {
@@ -24,17 +24,22 @@
   },
   {
    "account": "Z Finance",
-   "title": "才华横溢!自用款【菜瓜数据】竞价异动都不会看?",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
    "title": "DeepSeek招土木工程师;腾讯参投!林俊旸深夜官宣新公司:做下一代AI智能体;宇树科技中签号出炉:共19414个丨雷峰早报",
    "reason": "antispider"
   },
   {
    "account": "Z Finance",
    "title": "Anthropic创始人的「抽象」B面:拍墓碑广告、研究AI末日、对赚钱毫无兴趣",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "10倍生产力,从WorkBuddy、千问、豆包等AI办公产品说起",
+   "reason": "antispider"
+  },
+  {
+   "account": "Z Finance",
+   "title": "[AI前沿速递] AI热点简报 0810",
    "reason": "antispider"
   },
   {
@@ -53,23 +58,13 @@
    "reason": "antispider"
   },
   {
-   "account": "Z Potentials",
-   "title": "Z动态|『玩点旅行』发布AI操作系统,打通旅游“最后一公里”",
-   "reason": "antispider"
-  },
-  {
-   "account": "华尔街见闻",
-   "title": "华尔街见闻早餐 2026年8月12日",
-   "reason": "antispider"
-  },
-  {
    "account": "华尔街见闻",
    "title": "两个知识库+一个Skill:华尔街见闻把财经研究带进ima",
    "reason": "antispider"
   },
   {
    "account": "华尔街见闻",
-   "title": "华尔街见闻早餐2026年8月10日",
+   "title": "华尔街见闻早餐 2026年8月13日",
    "reason": "antispider"
   }
  ]
