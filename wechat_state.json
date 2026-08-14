@@ -1,15 +1,15 @@
 {
- "consecutive_failures": 3,
+ "consecutive_failures": 4,
  "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-13T13:14:58Z",
- "last_ok_accounts": 15,
- "last_fail_accounts": 0,
+ "last_run_at": "2026-08-14T02:04:00Z",
+ "last_ok_accounts": 10,
+ "last_fail_accounts": 5,
  "last_items": 0,
- "last_candidate_count": 11,
+ "last_candidate_count": 12,
  "last_resolved_count": 0,
- "last_filtered_count": 11,
+ "last_filtered_count": 12,
  "last_failure_reasons": {
-  "antispider": 11
+  "antispider": 12
  },
  "last_failed_candidates": [
   {
@@ -24,12 +24,12 @@
   },
   {
    "account": "Z Finance",
-   "title": "DeepSeek招土木工程师;腾讯参投!林俊旸深夜官宣新公司:做下一代AI智能体;宇树科技中签号出炉:共19414个丨雷峰早报",
+   "title": "才华横溢!自用款【菜瓜数据】竞价异动都不会看?",
    "reason": "antispider"
   },
   {
    "account": "Z Finance",
-   "title": "毕顿留学专访第7期|哥大&南加大|金融工程&运筹学&量化金融&人工智能与商业分析offer|2026fall Z同学专访",
+   "title": "DeepSeek招土木工程师;腾讯参投!林俊旸深夜官宣新公司:做下一代AI智能体;宇树科技中签号出炉:共19414个丨雷峰早报",
    "reason": "antispider"
   },
   {
@@ -53,18 +53,23 @@
    "reason": "antispider"
   },
   {
+   "account": "Z Potentials",
+   "title": "Z动态|『玩点旅行』发布AI操作系统,打通旅游“最后一公里”",
+   "reason": "antispider"
+  },
+  {
+   "account": "华尔街见闻",
+   "title": "华尔街见闻早餐 2026年8月12日",
+   "reason": "antispider"
+  },
+  {
    "account": "华尔街见闻",
    "title": "两个知识库+一个Skill:华尔街见闻把财经研究带进ima",
    "reason": "antispider"
   },
   {
-   "account": "数字生命卡兹克",
-   "title": "AI 写的中文为什么都是同一张脸?AI领域知名博主卡兹克把根治方法开源了!",
-   "reason": "antispider"
-  },
-  {
-   "account": "Elsewhere 别处发生",
-   "title": "突然悟了如何逆向调教小红书算法 | 已验证成功~",
+   "account": "华尔街见闻",
+   "title": "华尔街见闻早餐2026年8月10日",
    "reason": "antispider"
   }
  ]
