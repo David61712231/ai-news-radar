@@ -229,14 +229,19 @@ def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> 
             kept = 0
             for r in results:
                 real_url, reason = resolve_real_url(r.get("sogouLink", ""), cookie)
+                it = dict(r)
                 if real_url:
-                    it = dict(r)
                     it["url"] = real_url
                     it["id"] = "wechat:" + hashlib.md5(real_url.encode("utf-8")).hexdigest()[:12]
-                    items.append(it)
                     stats["resolved_count"] += 1
                     kept += 1
                 else:
+                    # Keep discovered candidates visible, but never publish a
+                    # Sogou redirect URL that can lead readers to a CAPTCHA page.
+                    it["url"] = ""
+                    it["id"] = "wechat:" + hashlib.md5(r.get("sogouLink", "").encode("utf-8")).hexdigest()[:12]
+                    it["originalUrlStatus"] = "unresolved"
+                    it["originalUrlReason"] = reason or "resolve_failed"
                     stats["filtered_count"] += 1
                     failed_candidates.append({
                         "account": name,
@@ -244,6 +249,7 @@ def fetch_all(accounts: list[str], cookie: str, per_account: int, days: int) -> 
                         "sogouLink": r.get("sogouLink", ""),
                         "reason": reason or "resolve_failed",
                     })
+                items.append(it)
                 time.sleep(random.uniform(0.3, 0.8))
             stats["ok_accounts"] += 1
             print(f"  [OK] {name}: 搜索候选 {len(results)} 篇，原文解析成功 {kept} 篇")
@@ -301,7 +307,7 @@ def main() -> int:
     except (OSError, json.JSONDecodeError):
         pass
 
-    success = stats["resolved_count"] > 0
+    success = stats["candidate_count"] > 0
     if success:
         state["consecutive_failures"] = 0
         state["last_success_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")

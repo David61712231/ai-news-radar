@@ -62,8 +62,6 @@ jobs:
         # 连续 2 天全部失败时由下方告警步骤创建 Issue
         id: wechat
         continue-on-error: true
-        env:
-          SOGOU_COOKIE: ${{ secrets.SOGOU_COOKIE }}
         run: python3 scripts/fetch_wechat.py --accounts accounts.json --out wechat_items.json --state wechat_state.json --per-account 5 --days 7
 
       - name: 生成静态快照（aihot API + 公众号合并）
@@ -97,6 +95,7 @@ jobs:
           fi
 
       - name: 公众号源断流告警（连续 2 天失败时创建 Issue）
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

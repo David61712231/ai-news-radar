@@ -34,7 +34,7 @@ class FetchWechatTests(unittest.TestCase):
             "https://weixin.sogou.com/link?url=https%3A%2F%2Fmp.weixin.qq.com%2Fs%3Fid%3D1&query=Z%20Finance",
         )
 
-    def test_resolve_failure_candidate_is_not_output(self):
+    def test_resolve_failure_candidate_is_kept_without_redirect_url(self):
         fake_candidates = [{
             "title": "t1",
             "summary": "s1",
@@ -49,7 +49,9 @@ class FetchWechatTests(unittest.TestCase):
                 mock.patch.object(FETCH_WECHAT.random, "uniform", return_value=0.0):
             items, stats, failed_candidates = FETCH_WECHAT.fetch_all(["Z Finance"], "", per_account=5, days=7)
 
-        self.assertEqual(items, [])
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["url"], "")
+        self.assertEqual(items[0]["originalUrlStatus"], "unresolved")
         self.assertEqual(stats["candidate_count"], 1)
         self.assertEqual(stats["resolved_count"], 0)
         self.assertEqual(stats["filtered_count"], 1)

@@ -276,16 +276,22 @@ function cardHTML(i, n, ctx){
   const m = matchCache[i.id];
   const hasUpdate = isTracked && m && (m.related.length || m.changed);
   const badge = ctx==="fav" ? updatePanelHTML(i.id) : (hasUpdate ? updatePanelHTML(i.id) : "");
+  const title = i.url
+    ? '<a href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">' + esc(i.title) + '</a>'
+    : esc(i.title);
+  const read = i.url
+    ? '<a class="read" href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">阅读原文 →</a>'
+    : '<span class="read" style="opacity:.55">原文待核验</span>';
   return '<article class="card ' + (wx?'wx':'') + ' ' + (hasUpdate?'updated':'') + '" style="--c:' + (SECTION_COLORS[i.category]||'#64748b') + '">' +
     badge +
     '<div class="ct">' + (ctx==="fav" ? '' : '<span class="num">' + String(n).padStart(2,'0') + '</span>') +
       '<span class="' + (wx?'source wx':'source') + '">' + esc(i.source) + '</span>' +
       '<span class="time">' + esc(i.timeText || fmtLiveTime(i.publishedAt)) + '</span></div>' +
-    '<h3 class="title"><a href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">' + esc(i.title) + '</a></h3>' +
+    '<h3 class="title">' + title + '</h3>' +
     '<p class="summary">' + esc(i.summary) + '</p>' +
     (ctx==="fav" ? '<div class="fav-meta">追踪于 ' + esc(String(tracked[i.id].trackedAt||"").slice(0,10)) +
       ' · 关键词：' + ((tracked[i.id].keywords||[]).map(k=>'<span class="kw-chip">'+esc(k)+'</span>').join("") || "无") + '</div>' : '') +
-    '<div class="card-foot"><a class="read" href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">阅读原文 →</a>' +
+    '<div class="card-foot">' + read +
       (ctx==="fav"
         ? '<button class="untrack-btn" type="button" data-id="' + esc(i.id) + '">取消追踪 ✕</button>'
         : '<button class="track-btn ' + (isTracked?'on':'') + '" type="button" data-id="' + esc(i.id) + '">' + (isTracked ? "已追踪 ✓" : "☆ 追踪") + '</button>') +
