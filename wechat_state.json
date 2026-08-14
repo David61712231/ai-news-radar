@@ -1,71 +1,13 @@
 {
- "consecutive_failures": 5,
- "last_success_at": "2026-08-13T06:20:56Z",
- "last_run_at": "2026-08-14T06:16:42Z",
- "last_ok_accounts": 10,
- "last_fail_accounts": 5,
- "last_items": 0,
- "last_candidate_count": 11,
- "last_resolved_count": 0,
- "last_filtered_count": 11,
- "last_failure_reasons": {
-  "antispider": 11
- },
- "last_failed_candidates": [
-  {
-   "account": "机器之心",
-   "title": "机器之心对话罗平|机器人是具身大模型的「用户」:超维动力如何打通从人类经验到机器人行动?",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "Z Waves|专访百度搭子负责人李景秋:一个入口调度所有软件,百度要重做一遍白领的工作方式",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "DeepSeek招土木工程师;腾讯参投!林俊旸深夜官宣新公司:做下一代AI智能体;宇树科技中签号出炉:共19414个丨雷峰早报",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "Anthropic创始人的「抽象」B面:拍墓碑广告、研究AI末日、对赚钱毫无兴趣",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "10倍生产力,从WorkBuddy、千问、豆包等AI办公产品说起",
-   "reason": "antispider"
-  },
-  {
-   "account": "Z Finance",
-   "title": "[AI前沿速递] AI热点简报 0810",
-   "reason": "antispider"
-  },
-  {
-   "account": "Founder Park",
-   "title": "Waffo 出席 Founder Park AGI Playground",
-   "reason": "antispider"
-  },
-  {
-   "account": "瑞恩资本",
-   "title": "瑞恩百胜中国(09987): 上半年收入增11.1%,肯德基收入增10.3%、门店达13789家,必胜客收入增8.6%、门店达4549家",
-   "reason": "antispider"
-  },
-  {
-   "account": "DeepTech 深科技",
-   "title": "deep‑tech",
-   "reason": "antispider"
-  },
-  {
-   "account": "华尔街见闻",
-   "title": "两个知识库+一个Skill:华尔街见闻把财经研究带进ima",
-   "reason": "antispider"
-  },
-  {
-   "account": "华尔街见闻",
-   "title": "华尔街见闻早餐 2026年8月13日",
-   "reason": "antispider"
-  }
- ]
+ "consecutive_failures": 0,
+ "last_success_at": "2026-08-14T07:24:16Z",
+ "last_run_at": "2026-08-14T07:24:16Z",
+ "last_ok_accounts": 13,
+ "last_fail_accounts": 2,
+ "last_items": 10,
+ "last_candidate_count": 10,
+ "last_resolved_count": 10,
+ "last_filtered_count": 0,
+ "last_failure_reasons": {},
+ "last_failed_candidates": []
 }
