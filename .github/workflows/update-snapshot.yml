@@ -9,7 +9,7 @@
 #   → 生成静态快照（aihot API + 公众号数据合并 → public/index.html）
 #   → 校验数据 → 提交回仓库（contents: write）→ 断流告警检查 → 部署到 GitHub Pages
 #
-# 固定访问链接：https://wadeliuastro.github.io/AI-HOT/
+# 固定访问链接：https://david61712231.github.io/ai-news-radar/
 # 前置条件：仓库 Settings → Pages → Source 选择 "GitHub Actions"
 # 可选 Secret：SOGOU_COOKIE（搜狗 Cookie，降低公众号抓取被风控概率，约 2-4 周需更新）
 
@@ -142,4 +142,4 @@ jobs:
         if: ${{ steps.deployment.outputs.page_url != '' }}
         run: |
           echo "### ✅ 看板已更新，固定访问链接：" >> $GITHUB_STEP_SUMMARY
-          echo "[AI HOT 仪表盘](https://wadeliuastro.github.io/AI-HOT/)" >> $GITHUB_STEP_SUMMARY
+          echo "[AI HOT 仪表盘](https://david61712231.github.io/ai-news-radar/)" >> $GITHUB_STEP_SUMMARY

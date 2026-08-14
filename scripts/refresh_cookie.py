@@ -26,7 +26,7 @@ import urllib.request
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 COOKIE_FILE = os.path.join(REPO_ROOT, ".sogou_cookie")
-SECRET_URL = "https://github.com/WadeLiuAstro/AI-HOT/settings/secrets/actions/SOGOU_COOKIE"
+SECRET_URL = "https://github.com/David61712231/ai-news-radar/settings/secrets/actions/SOGOU_COOKIE"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
 
