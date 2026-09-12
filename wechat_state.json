@@ -1,7 +1,7 @@
 {
- "consecutive_failures": 84,
+ "consecutive_failures": 85,
  "last_success_at": "2026-08-14T07:33:54Z",
- "last_run_at": "2026-09-12T09:04:01Z",
+ "last_run_at": "2026-09-12T15:10:52Z",
  "last_ok_accounts": 15,
  "last_fail_accounts": 0,
  "last_items": 0,
